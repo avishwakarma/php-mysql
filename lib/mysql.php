@@ -1,6 +1,6 @@
 <?php
 /**
- * MySQL
+ * mysql
  *
  * Core database related properties and methods
  *
@@ -16,7 +16,7 @@
  * @since         v 1.0
  * @license       Copyright 2014 Ashok Vishwakarma (http://ashokvishwakarma.in )
  */
-class MySQL{
+class mysql{
 	
 	/**
 	 * MySQL databse host details
