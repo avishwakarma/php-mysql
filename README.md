@@ -123,6 +123,22 @@ Method array_escape will escape mysql chars from an array
 
     $clean_array = $db->array_escape($dirty_array);
     
+hasOne
+-------
+Property to fetch associated record from other tables
+
+    $this->hasOne = array('table1', 'table2');
+
+Columns should be `tablename_id` into the parent table
+
+hasMany
+-------
+Property to fetch associated record from other tables
+
+    $this->hasMany = array('table1', 'table2');
+    
+Columns sould be `tablename_id` into the child tables with `id` as a link
+    
 
 Further if you have any query please feel free to write me akvlko[@]gamil[.]com
 
