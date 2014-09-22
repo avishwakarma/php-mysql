@@ -7,17 +7,16 @@
  * PHP versions 5.x
  *
  * Ashok Vishwakarma
- * Copyright 2013 Ashok Vishwakarma (http://ashokvishwakarma.in )
+ * Copyright 2014 Ashok Vishwakarma (http://ashokvishwakarma.in )
  *
  * Redistributions of files is strictly prohibited.
  *
- * @copyright     Copyright 2013 Ashok Vishwakarma
+ * @copyright     Copyright 2014 Ashok Vishwakarma
  * @link          http://ashokvishwakarma.in 
  * @since         v 1.0
- * @license       Copyright 2013 Ashok Vishwakarma (http://ashokvishwakarma.in )
+ * @license       Copyright 2014 Ashok Vishwakarma (http://ashokvishwakarma.in )
  */
-
-class mysql{
+class MySQL{
 	
 	/**
 	 * MySQL databse host details
@@ -68,8 +67,24 @@ class mysql{
 	private $_link;
 	
 	/**
+	 * Has One Resource from other table
+	 *
+	 * @var array
+	 * @access public
+	 */
+	public $hasOne = false;
+	
+	/**
+	 * Has Many Resource from other table
+	 *
+	 * @var array
+	 * @access public
+	 */
+	public $hasMany = false;
+	
+	/**
 	 * Constructor
-	 * 
+	 *
 	 * Initialize all the required variables
 	 * Connect to the database
 	 *
@@ -168,7 +183,29 @@ class mysql{
 		try{
 			$data= array();
 			while($row = mysql_fetch_assoc($res)){
-				$data[] = $row;
+				if($this->hasOne){
+					$hasData = array();
+					foreach ($this->hasOne as $model){
+						$r = $this->query("SELECT * FROM  " . $model . " WHERE " . $model . ".id = " . $row[$model . "_id"] . " LIMIT 1");
+						$hasData[$model] = $this->fetch_assoc($r);
+					}
+				}else if($this->hasMany){
+					$hasData = array();
+					foreach($this->hasMany as $model){
+						$r = $this->query("SELECT * FROM  " . $model . " WHERE " . $model . "." . $this->table . "_id" . " = " . $row['id'] . " LIMIT 1");
+						$hasData[$model] = array();
+						while($rw = mysql_fetch_assoc($r)){
+							$hasData[$model][] = $rw;
+						}
+					}
+				}
+				if($hasData){
+					$d = $hasData;
+				}else{
+					$d = array();
+				}
+				$d[$this->table] = $row;
+				$data[] = $d;
 			}
 			return $data;
 		}catch (Exception $e){
