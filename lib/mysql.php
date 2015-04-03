@@ -1,6 +1,6 @@
 <?php
 /**
- * mysql
+ * MySQL
  *
  * Core database related properties and methods
  *
@@ -64,7 +64,7 @@ class mysql{
 	 * @var string
 	 * @access private
 	 */
-	private $_link;
+	private static $_link;
 	
 	/**
 	 * Has One Resource from other table
@@ -72,7 +72,7 @@ class mysql{
 	 * @var array
 	 * @access public
 	 */
-	public $hasOne = false;
+	public static $hasOne = false;
 	
 	/**
 	 * Has Many Resource from other table
@@ -80,22 +80,43 @@ class mysql{
 	 * @var array
 	 * @access public
 	 */
-	public $hasMany = false;
+	public static $hasMany = false;
+	
+	/**
+	 * Has Many Resource from other table
+	 *
+	 * @var array
+	 * @access public
+	 */
+	public static $table = false;
 	
 	/**
 	 * Constructor
 	 *
-	 * Initialize all the required variables
-	 * Connect to the database
+	 * protected costructor
 	 *
 	 */
-	function __construct(){
+	protected function __construct(){
+		
+	}
+	
+	/*
+	 * init
+	*
+	* Initialize all the required variables
+	* Connect to the database
+	*
+	*/
+	
+	public static function init(){
 		try {
 			self::$_host = HOST;
 			self::$_user = USER;
 			self::$_password = PASSWORD;
 			self::$_database = DATABASE;
-			$this->connect();
+			if(empty(self::$_link)){
+				self::connect();
+			}
 		}catch (Exception $e){
 			echo 'Error: ',  $e->getMessage(), "\n";
 		}
@@ -109,10 +130,10 @@ class mysql{
 	 * @return null
 	 * @access public
 	 */
-	public function  connect(){
+	public static function  connect(){
 		try{
-			$this->_link = mysql_pconnect(self::$_host, self::$_user, self::$_password);
-			mysql_select_db(self::$_database, $this->_link);
+			self::$_link = @mysql_pconnect(self::$_host, self::$_user, self::$_password);
+			@mysql_select_db(self::$_database, self::$_link);
 		}catch(Exception $e){
 			echo 'Error: ',  $e->getMessage(), "\n";
 		}
@@ -126,7 +147,7 @@ class mysql{
 	 * @return null
 	 * @access public
 	 */
-	public function disconnect($link){
+	public static function disconnect($link){
 		@mysql_close($link);
 	}
 	
@@ -140,12 +161,12 @@ class mysql{
 	 * @access public
 	 * @uses $obj->find(array('fields'=>array('id','name', ....), 'conditions'=>'id = 1', 'order'=>'id ASC', 'limit'=>10));
 	 */
-	public function find($params = array()){
+	public static function find($params = array()){
 		try{
-			$param_data = $this->_parse_query_param($params);
-			$query = $this->_build_query('select', $param_data);
-			$res = $this->query($query);
-			$result = $this->fetch_result($res);
+			$param_data = self::_parse_query_param($params);
+			$query = self::_build_query('select', $param_data);
+			$res = self::query($query);
+			$result = self::fetch_result($res);
 			return $result;
 		}catch (Exception $e){
 			echo 'Error: ',  $e->getMessage(), "\n";
@@ -161,10 +182,14 @@ class mysql{
 	 * @access public
 	 * @example $obj->query("SELECT columns FROM table");
 	 */
-	public function query($query){
+	public static function query($query){
 		try{
-			return mysql_query($query, $this->_link);
+			if(empty(self::$_link)){
+				self::connect();
+			}
+			return mysql_query($query, self::$_link);
 		}catch	(Exception $e){
+			self::connect();
 			echo 'Error: ',  $e->getMessage(), "\n";
 		}
 	}
@@ -179,32 +204,34 @@ class mysql{
 	 * @access public
 	 * @example $obj->fetch_result($res);
 	 */
-	public function fetch_result($res){
+	public static function fetch_result($res){
 		try{
 			$data= array();
 			while($row = mysql_fetch_assoc($res)){
-				if($this->hasOne){
+				if(self::$hasOne){
 					$hasData = array();
-					foreach ($this->hasOne as $model){
-						$r = $this->query("SELECT * FROM  " . $model . " WHERE " . $model . ".id = " . $row[$model . "_id"] . " LIMIT 1");
-						$hasData[$model] = $this->fetch_assoc($r);
+					foreach (self::$hasOne as $model){
+						$key = Inflector::singularize($model);
+						$r = self::query("SELECT * FROM  " . $model . " WHERE " . $model . ".id = " . $row[$key . "_id"] . " LIMIT 1");
+						$hasData[$key] = self::fetch_assoc($r);
 					}
-				}else if($this->hasMany){
+				}else if(self::$hasMany){
 					$hasData = array();
-					foreach($this->hasMany as $model){
-						$r = $this->query("SELECT * FROM  " . $model . " WHERE " . $model . "." . $this->table . "_id" . " = " . $row['id'] . " LIMIT 1");
+					foreach(self::$hasMany as $model){
+						$key = Inflector::singularize($model);
+						$r = self::query("SELECT * FROM  " . $model . " WHERE " . $model . "." . $key . "_id" . " = " . $row['id'] . " LIMIT 1");
 						$hasData[$model] = array();
 						while($rw = mysql_fetch_assoc($r)){
 							$hasData[$model][] = $rw;
 						}
 					}
 				}
-				if($hasData){
+				if(!empty($hasData)){
 					$d = $hasData;
 				}else{
 					$d = array();
 				}
-				$d[$this->table] = $row;
+				$d[self::$table] = $row;
 				$data[] = $d;
 			}
 			return $data;
@@ -222,7 +249,7 @@ class mysql{
 	 * @access public
 	 * @example $obj->fetch_result($res);
 	 */
-	public function fetch_assoc($res){
+	public static function fetch_assoc($res){
 		try{
 			return  mysql_fetch_assoc($res);
 		}catch (Exception $e){
@@ -241,11 +268,11 @@ class mysql{
 	 * @example $obj->save($data);
 	 * Please make sure your feilds name as your columns name
 	 */
-	public function save($data){
+	public static function save($data){
 		try{
-			$query = $this->_build_query('insert', $data);
-			$res = $this->query($query);
-			return $this->get_insert_id();
+			$query = self::_build_query('insert', $data);
+			$res = self::query($query);
+			return self::get_insert_id();
 		}catch (Exception $e){
 			echo 'Error: ',  $e->getMessage(), "\n";
 		}
@@ -262,10 +289,10 @@ class mysql{
 	 * @example $obj->save($data);
 	 * Please make sure your feilds name as your columns name
 	 */
-	public function update($data, $conditions){
+	public static function update($data, $conditions){
 		try{
-			$query = $this->_build_query('update', $data, $conditions);
-			$res = $this->query($query);
+			$query = self::_build_query('update', $data, $conditions);
+			$res = self::query($query);
 			if($res){
 				return true;
 			}
@@ -284,10 +311,10 @@ class mysql{
 	 * @example $obj->save($data);
 	 * Please make sure your feilds name as your columns name
 	 */
-	public function delete($conditions){
+	public static function delete($conditions){
 		try{
-			$query = "DELETE FROM $this->table WHERE $conditions";
-			$res = $this->query($query);
+			$query = "DELETE FROM self::$table WHERE $conditions";
+			$res = self::query($query);
 			if($res){
 				return true;
 			}
@@ -307,8 +334,8 @@ class mysql{
 	 * @access public
 	 * @example $obj->get_insert_id();
 	 */
-	public function get_insert_id(){
-		return mysql_insert_id($this->_link);
+	public static function get_insert_id(){
+		return mysql_insert_id(self::$_link);
 	}
 	
 	
@@ -319,10 +346,10 @@ class mysql{
 	 * @return array of columns
 	 * @access private
 	 */
-	private function _fetch_columns(){
+	private static function _fetch_columns(){
 		try{
 			$columns = array();
-			$res = $this->query("SHOW COLUMNS FROM " . $this->table);
+			$res = self::query("SHOW COLUMNS FROM " . self::$table);
 			while($row = mysql_fetch_array($res)){
 				$columns[] = $row[0];
 			}
@@ -341,7 +368,7 @@ class mysql{
 	 * @return array
 	 * @access public
 	 */
-	private function _parse_query_param($p = array()){
+	private static function _parse_query_param($p = array()){
 		try{
 			$query_parameter = array();
 			if(!empty($p)){
@@ -389,13 +416,13 @@ class mysql{
 	 * @access private
 	 * While using save method please make sure your fields name should be as columns name
 	 */
-	private function _build_query($type, $param, $conditions = null){
+	private static function _build_query($type, $param, $conditions = null){
 		try{
 			$query = "";
 			if($type == 'select'){
 				$query = "
 					SELECT " . $param['fields'] . "
-					FROM ". $this->table ."
+					FROM ". self::$table ."
 					WHERE ". $param['conditions'] ." 
 					ORDER BY ". $param['order'] ."
 				";
@@ -403,7 +430,7 @@ class mysql{
 					$query .="LIMIT ". $param['limit'];
 				}
 			}else if($type == 'insert'){
-				$columns = $this->_fetch_columns();
+				$columns = self::_fetch_columns();
 				$query_cols = '';
 				$query_values = '';
 				foreach ($param as $col=>$val){
@@ -414,9 +441,9 @@ class mysql{
 				}
 				$query_cols = rtrim($query_cols, ',');
 				$query_values = rtrim($query_values, ',');
-				$query = "INSERT INTO " . $this->table . " (" . $query_cols . ") VALUES (" . $query_values . ")"; 
+				$query = "INSERT INTO " . self::$table . " (" . $query_cols . ") VALUES (" . $query_values . ")"; 
 			}else if($type == 'update'){
-				$columns = $this->_fetch_columns();
+				$columns = self::_fetch_columns();
 				$query_data = '';
 				foreach($param as $col=>$val){
 					if(in_array($col, $columns)){
@@ -424,7 +451,7 @@ class mysql{
 					}
 				}
 				$query_data = rtrim($query_data, ',');
-				$query = "UPDATE ". $this->table . " SET " .$query_data ." ";
+				$query = "UPDATE ". self::$table . " SET " .$query_data ." ";
 				if($conditions){
 					$query .= "WHERE " . $conditions;
 				}
@@ -443,7 +470,7 @@ class mysql{
 	 * @return string
 	 * @access public
 	 */
-	public function escape($string){
+	public static function escape($string){
 		return mysql_real_escape_string($string);
 	}
 	
@@ -454,21 +481,8 @@ class mysql{
 	 * @return array
 	 * @access public
 	 */
-	public function array_escape($arr){
-		return array_map($this->escape, $arr);
-	}
-	
-	/**
-	 * Destructor
-	 * 
-	 * Destruct the class instance
-	 * Disconnect to the database
-	 *
-	 */
-	function __destruct(){
-		if($this->_link){
-			$this->disconnect($this->_link);
-		}
+	public static function array_escape($arr){
+		return array_map(self::escape, $arr);
 	}
 }
 ?>
